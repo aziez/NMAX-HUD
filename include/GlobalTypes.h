@@ -12,7 +12,9 @@ enum SystemMode {
     MODE_GAME,
     MODE_ROBOT,
     MODE_FIND_BIKE,
-    MODE_WIFI   
+    MODE_WIFI,   
+
+    MODE_ANY
 };
 
 enum RobotEmotion {

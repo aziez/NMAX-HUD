@@ -4,6 +4,8 @@
 
 #include "Config.h"
 #include "GlobalTypes.h"
+#include "InputAction.h"
+
 #include "DisplayManager.h"
 #include "InputManager.h"
 #include "BluetoothManager.h"
@@ -29,6 +31,7 @@ NotificationData  notifData;
 MusicData         musicData;
 OTAData           otaData;
 
+/* ================= SYSTEM ================= */
 SystemMode currentMode  = MODE_SPEEDO;
 SystemMode previousMode = MODE_SPEEDO;
 
@@ -42,15 +45,13 @@ bool isJumping = false;
 
 /* ================= TIMING ================= */
 unsigned long lastDrawTime = 0;
-unsigned long lastMusicInteraction = 0;
 
 /* ================= FLAGS ================= */
 bool bootCounterReset = false;
-SystemMode lastLoopMode = MODE_SPEEDO;
 
 /* ================= PROTOTYPES ================= */
 void updateGameLogic();
-void processCommand(int cmd);
+void handleAction(InputAction action);
 void switchMode();
 
 /* ================= SETUP ================= */
@@ -60,7 +61,7 @@ void setup() {
 
   /* ==== DISPLAY ==== */
   dispMgr.begin();
-  dispMgr.setBrightness(255);
+  dispMgr.setBrightness(DEFAULT_BRIGHTNESS);
 
   /* ==== BOOT PROTECTION ==== */
   preferences.begin("boot_cfg", false);
@@ -91,7 +92,7 @@ void setup() {
   dispMgr.showBootCheck("STORAGE", "LOAD", 20);
   preferences.begin("nmax_config", true);
   dashData.customName = preferences.getString("name", DEFAULT_NAME);
-  dispMgr.setBrightness(preferences.getInt("bri", 255));
+  dispMgr.setBrightness(preferences.getInt("bri", DEFAULT_BRIGHTNESS));
   preferences.end();
 
   /* ==== MODULE INIT ==== */
@@ -132,19 +133,17 @@ void loop() {
 
   btMgr.update(&navData, &notifData, &dashData, &musicData, &currentMode);
 
-  /* ==== MUSIC AUTO EXIT ==== */
-//   if (currentMode == MODE_MUSIC && lastLoopMode != MODE_MUSIC)
-//     lastMusicInteraction = millis();
-
-//   if (currentMode == MODE_MUSIC && millis() - lastMusicInteraction > 5000)
-//     currentMode = MODE_SPEEDO;
-
-  lastLoopMode = currentMode;
-
-  /* ==== SERIAL COMMAND ==== */
+  /* ==== SERIAL OTA ==== */
   if (Serial.available()) {
-    if (Serial.readStringUntil('\n') == "ota")
+    if (Serial.readStringUntil('\n') == "ota") {
       currentMode = MODE_WIFI;
+    }
+  }
+
+  /* ==== HANDLE INPUT ACTION ==== */
+  if (inputMgr.hasAction()) {
+    InputAction action = inputMgr.consumeAction();
+    handleAction(action);
   }
 
   /* ==== WIFI MODE ==== */
@@ -167,53 +166,30 @@ void loop() {
       dispMgr.show();
     }
 
-    if (!netMgr.isActive()) {
-      btMgr.begin(BT_DEVICE_NAME, &preferences, &rtc);
-      btMgr.bindMode(&currentMode, &previousMode);
-      currentMode = MODE_SPEEDO;
-      dispMgr.renderToast("WIFI OFF");
-    }
     return;
   }
-
-  /* ==== GAME INPUT ==== */
-  if (currentMode == MODE_GAME && inputMgr.isGameJump()) {
-    if (gameState == GAME_READY) {
-      gameState = GAME_PLAYING;
-      gameScore = 0;
-      obstacleX = 128;
-      bikeY = 40;
-    } else if (gameState == GAME_PLAYING && !isJumping) {
-      isJumping = true;
-    } else if (gameState == GAME_OVER) {
-      gameState = GAME_READY;
-    }
-  }
-
-  /* ==== COMMAND ==== */
-  int cmd = inputMgr.getCommand();
-  if (cmd > 0) processCommand(cmd);
 
   /* ==== DRAW ==== */
   if (millis() - lastDrawTime > DRAW_INTERVAL) {
     lastDrawTime = millis();
 
-    if (currentMode == MODE_GAME && gameState == GAME_PLAYING)
+    if (currentMode == MODE_GAME && gameState == GAME_PLAYING) {
       updateGameLogic();
+    }
 
     dispMgr.clear();
     dispMgr.updateAnimations();
 
     switch (currentMode) {
-      case MODE_SPEEDO:    dispMgr.renderSpeedometer(dashData, musicData); break;
-      case MODE_COMPASS:   dispMgr.renderCompass(dashData); break;
-      case MODE_NAVIGASI:  dispMgr.renderNavigation(navData, dashData.currentSpeed); break;
-      case MODE_NOTIFIKASI:dispMgr.renderNotification(notifData); break;
-      case MODE_MUSIC:     dispMgr.renderMusic(musicData); break;
-      case MODE_GAME:      dispMgr.renderGame(gameState, gameScore, bikeY, obstacleX, roadLineX); break;
-      case MODE_ROBOT:     dispMgr.renderRobotEyes(); break;
-      case MODE_FIND_BIKE: dispMgr.renderFindBike(); break;
-      default:             dispMgr.renderSpeedometer(dashData, musicData); break;
+      case MODE_SPEEDO:     dispMgr.renderSpeedometer(dashData, musicData); break;
+      case MODE_COMPASS:    dispMgr.renderCompass(dashData); break;
+      case MODE_NAVIGASI:   dispMgr.renderNavigation(navData, dashData.currentSpeed); break;
+      case MODE_NOTIFIKASI: dispMgr.renderNotification(notifData); break;
+      case MODE_MUSIC:      dispMgr.renderMusic(musicData); break;
+      case MODE_GAME:       dispMgr.renderGame(gameState, gameScore, bikeY, obstacleX, roadLineX); break;
+      case MODE_ROBOT:      dispMgr.renderRobotEyes(); break;
+      case MODE_FIND_BIKE:  dispMgr.renderFindBike(); break;
+      default:              dispMgr.renderSpeedometer(dashData, musicData); break;
     }
 
     dispMgr.show();
@@ -221,97 +197,79 @@ void loop() {
 
   /* ==== NOTIF TIMEOUT ==== */
   if (currentMode == MODE_NOTIFIKASI &&
-      millis() - notifData.startTime > 8000) {
+      millis() - notifData.startTime > NOTIF_DURATION) {
     notifData.isActive = false;
     currentMode = MODE_SPEEDO;
   }
 }
 
-/* ================= HELPERS ================= */
-void processCommand(int cmd) {
+/* ================= ACTION HANDLER ================= */
+void handleAction(InputAction action) {
 
-     if (currentMode == MODE_MUSIC) {
-        switch (cmd) {
-        case 1:
-            btMgr.sendCommand("CMD:NEXT");
-            dispMgr.renderToast("NEXT");
-            break;
+  switch (action) {
 
-        case 2:
-            btMgr.sendCommand("CMD:PLAYPAUSE");
-            musicData.isPlaying = !musicData.isPlaying;
-            dispMgr.renderToast(musicData.isPlaying ? "PAUSE" : "PLAY");
-            break;
-
-        case 3:
-            btMgr.sendCommand("CMD:PREV");
-            dispMgr.renderToast("PREV");
-            break;
-
-        case 99: // Long press = keluar
-            currentMode = MODE_SPEEDO;
-            dispMgr.renderToast("EXIT MUSIC");
-            break;
-        }
-        lastMusicInteraction = millis();
-        return;
-    }
-
-    if (cmd == 99) {
-        previousMode = currentMode;
-        currentMode = MODE_WIFI;
-        return;
-    }
-
-    if (currentMode == MODE_GAME) {
-        if (cmd == 4) {
-        currentMode = MODE_SPEEDO;
-        gameState = GAME_READY;
-        dispMgr.renderToast("EXIT GAME");
-        }
-        return;
-    }
-
-    if (currentMode == MODE_NOTIFIKASI) {
-        notifData.isActive = false;
-        currentMode = MODE_SPEEDO;
-        return;
-    }
-
-    switch (cmd) {
-    case 1:
-      btMgr.sendCommand("CMD:NEXT");
-      dispMgr.renderToast("NEXT");
-      currentMode = MODE_MUSIC;
-      lastMusicInteraction = millis();
+    /* ===== UI ===== */
+    case ACTION_NEXT_SCREEN:
+      switchMode();
       break;
 
-    case 2:
+    /* ===== MUSIC ===== */
+    case ACTION_MUSIC_PLAY_PAUSE:
       btMgr.sendCommand("CMD:PLAYPAUSE");
       musicData.isPlaying = !musicData.isPlaying;
       dispMgr.renderToast(musicData.isPlaying ? "PAUSE" : "PLAY");
       currentMode = MODE_MUSIC;
-      lastMusicInteraction = millis();
       break;
 
-    case 3:
+    case ACTION_MUSIC_NEXT:
+      btMgr.sendCommand("CMD:NEXT");
+      dispMgr.renderToast("NEXT");
+      currentMode = MODE_MUSIC;
+      break;
+
+    case ACTION_MUSIC_PREV:
       btMgr.sendCommand("CMD:PREV");
       dispMgr.renderToast("PREV");
       currentMode = MODE_MUSIC;
-      lastMusicInteraction = millis();
       break;
 
-    case 4:
-      switchMode();
+    /* ===== GAME ===== */
+    case ACTION_GAME_JUMP:
+      if (gameState == GAME_READY) {
+        gameState = GAME_PLAYING;
+        gameScore = 0;
+        obstacleX = 128;
+        bikeY = 40;
+      } else if (!isJumping) {
+        isJumping = true;
+      }
+      break;
+
+    case ACTION_GAME_EXIT:
+      currentMode = MODE_SPEEDO;
+      gameState = GAME_READY;
+      dispMgr.renderToast("EXIT GAME");
+      break;
+
+    /* ===== WIFI ===== */
+    case ACTION_OTA_MODE:
+      previousMode = currentMode;
+      currentMode = MODE_WIFI;
+      break;
+
+    default:
       break;
   }
 }
 
+/* ================= HELPERS ================= */
 void switchMode() {
   if (currentMode == MODE_SPEEDO) currentMode = MODE_COMPASS;
   else if (currentMode == MODE_COMPASS) currentMode = MODE_ROBOT;
-  else if (currentMode == MODE_ROBOT) { currentMode = MODE_GAME; gameState = GAME_READY; }
-  else currentMode = MODE_SPEEDO;
+  else if (currentMode == MODE_ROBOT) {
+    currentMode = MODE_GAME;
+    gameState = GAME_READY;
+  } else currentMode = MODE_SPEEDO;
 
   dispMgr.renderToast(
     currentMode == MODE_COMPASS ? "COMPASS" :
@@ -339,7 +297,7 @@ void updateGameLogic() {
   roadLineX -= 4;
   if (roadLineX < 0) roadLineX = 20;
 
-  if (obstacleX < 35 && obstacleX > 10 && bikeY > 30)
+  if (obstacleX < 35 && obstacleX > 10 && bikeY > 30) {
     gameState = GAME_OVER;
+  }
 }
-/* ================= UI CLASSES ================= */

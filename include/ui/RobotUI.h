@@ -60,11 +60,11 @@ private:
       }
 
       case ROBOT_SAD:
-        d->drawArc(cx, y + 6, 10, 180, 360);
+        d->drawArc(cx, y + 6, 10, 180, 104);
         break;
 
       case ROBOT_CRY:
-        d->drawArc(cx, y + 6, 10, 180, 360);
+        d->drawArc(cx, y + 6, 10, 180, 104);
         break;
 
       case ROBOT_ANGRY:

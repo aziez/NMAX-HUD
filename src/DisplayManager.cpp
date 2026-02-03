@@ -1,7 +1,7 @@
 #include "DisplayManager.h"
 
 DisplayManager::DisplayManager()
-  : u8g2(U8G2_R0, U8X8_PIN_NONE) {
+  : u8g2(U8G2_R2, U8X8_PIN_NONE) {
 
   anim = { false, 0, 0 };
   tBlink = tFrame = tScroll = 0;
