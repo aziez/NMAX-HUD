@@ -15,6 +15,8 @@
 #include "ui/RobotUI.h"
 #include "ui/WifiUI.h"
 #include "ui/CompassUI.h"
+#include "ui/ClockUI.h"
+#include "ui/MenuUI.h"
 
 struct AnimState {
   bool blink;
@@ -45,6 +47,8 @@ public:
   void renderNotification(NotificationData notif);
   void renderRobotEyes();
   void renderWiFi(OTAData ota);
+  void renderClock(DashboardData data);
+  void renderMenu(int selectedIndex, DashboardData data);
 
   void renderToast(String msg);
   void renderFindBike();
@@ -62,6 +66,8 @@ private:
   NotificationUI* uiNotif;
   RobotUI* uiRobot;
   WifiUI* uiWifi;
+  ClockUI* uiClock;
+  MenuUI* uiMenu;
 
   // Animation State
   AnimState anim;

@@ -1,7 +1,8 @@
 #include "DisplayManager.h"
+#include <Wire.h>
 
 DisplayManager::DisplayManager()
-  : u8g2(U8G2_R0, U8X8_PIN_NONE) {
+  : u8g2(U8G2_R2, U8X8_PIN_NONE) {
 
   anim = { false, 0, 0 };
   tBlink = tFrame = tScroll = 0;
@@ -19,10 +20,13 @@ DisplayManager::DisplayManager()
   uiNotif   = new NotificationUI(&u8g2);
   uiRobot   = new RobotUI(&u8g2);
   uiWifi    = new WifiUI(&u8g2);
+  uiClock   = new ClockUI(&u8g2);
+  uiMenu    = new MenuUI(&u8g2);
 }
 
 void DisplayManager::begin() {
   u8g2.begin();
+  Wire.setClock(400000); // 400kHz I2C for faster display updates
   u8g2.enableUTF8Print();
   u8g2.setContrast(DEFAULT_BRIGHTNESS);
 
@@ -210,19 +214,27 @@ void DisplayManager::renderWiFi(OTAData ota) {
   uiWifi->render(ota, anim.blink);
 }
 
+void DisplayManager::renderClock(DashboardData data) {
+  uiClock->render(data, data.clockStyle, anim.blink);
+}
+
+void DisplayManager::renderMenu(int selectedIndex, DashboardData data) {
+  uiMenu->render(selectedIndex, data);
+}
+
 /* ================= UTIL ================= */
 
 void DisplayManager::renderToast(String msg) {
-  u8g2.drawRBox(10, 20, 108, 24, 4);
+  u8g2.setDrawColor(1);
+  u8g2.drawRBox(5, 15, 118, 34, 4);
   u8g2.setDrawColor(0);
-  u8g2.drawRFrame(10, 20, 108, 24, 4);
-
+  u8g2.drawRBox(7, 17, 114, 30, 3);
+  
+  u8g2.setDrawColor(1);
   u8g2.setFont(u8g2_font_helvB10_tf);
   int w = u8g2.getStrWidth(msg.c_str());
-  u8g2.setCursor(64 - w / 2, 37);
+  u8g2.setCursor(64 - w / 2, 38);
   u8g2.print(msg);
-
-  u8g2.setDrawColor(1);
 }
 
 void DisplayManager::renderFindBike() {

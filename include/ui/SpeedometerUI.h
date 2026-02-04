@@ -2,6 +2,7 @@
 #define SPEEDO_UI_H
 
 #include "BaseUI.h"
+#include "TripManager.h"
 
 class SpeedometerUI : public BaseUI {
 public:
@@ -21,54 +22,42 @@ public:
 
     /* ================= SPEED ================= */
     d->setDrawColor(1);
-    d->setFont(FONT_MAIN);
+    d->setFont(u8g2_font_logisoso42_tn); // Bigger font for clear view
 
     int speed = data.currentSpeed;
-    int speedX =
-      (speed < 10)  ? 50 :
-      (speed < 100) ? 36 :
-                      22;
-
-    d->setCursor(speedX, 54);
-    d->print(speed);
+    String speedStr = String(speed);
+    int speedW = d->getStrWidth(speedStr.c_str());
+    int speedX = 64 - speedW/2;
+    
+    // Position speed 2px higher to give footer more room
+    d->setCursor(speedX, 50);
+    d->print(speedStr);
 
     /* ================= UNIT ================= */
-    d->setFont(u8g2_font_helvB10_tr);
-    d->setCursor(speedX + 56, 38);
-    d->print("KM");
-    d->setCursor(speedX + 56, 48);
-    d->print("/H");
+    d->setFont(u8g2_font_helvB08_tr);
+    // Move "KM/H" to be more visible, not hidden by speed
+    d->setCursor(95, 40); 
+    d->print("KM/H");
 
-    /* ================= SPEED BAR ================= */
-    int bar = constrain(map(speed, 0, 120, 0, 44), 0, 44);
-    if (speed > 0) {
-      d->drawBox(2, 56 - bar, 4, bar);
-      d->drawBox(122, 56 - bar, 4, bar);
-    }
+    /* ================= DECORATION ================= */
+    // Subtle arcs with 6px side padding
+    d->drawCircle(64, 32, 32, U8G2_DRAW_UPPER_RIGHT | U8G2_DRAW_UPPER_LEFT);
+    d->drawCircle(64, 32, 34, U8G2_DRAW_UPPER_RIGHT | U8G2_DRAW_UPPER_LEFT);
 
-    /* ================= SEPARATOR ================= */
-    d->drawLine(0, 56, 128, 56);
+    /* ================= FOOTER DATA ================= */
+    // Footer line with 8px margin
+    d->drawLine(8, 54, 120, 54);
+    d->setFont(u8g2_font_profont10_tf);
+    
+    // Trip Distance
+    d->setCursor(10, 63);
+    d->printf("TRIP: %.1f", data.tripDistance/1000.0);
 
-    /* ================= GPS STATE ================= */
-    d->setFont(FONT_TINY);
-
-    if (!data.isGpsFixed) {
-      if (blink) {
-        d->setCursor(30, 63);
-        d->print("GPS SEARCHING");
-      }
-      return;
-    }
-
-    /* ================= FOOTER ================= */
-    d->setCursor(2, 63);
-    d->print("TRIP ");
-    d->print(data.tripDistance / 1000.0, 1);
-    d->print("km");
-
-    d->setCursor(88, 63);
-    d->print("MAX ");
-    d->print(data.maxSpeed);
+    // Ride Time
+    String rt = TripManager::getFormattedTime(data.tripSeconds);
+    int rtW = d->getStrWidth(rt.c_str());
+    d->setCursor(118 - rtW, 63);
+    d->print(rt);
   }
 };
 

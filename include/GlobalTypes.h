@@ -12,7 +12,11 @@ enum SystemMode {
     MODE_GAME,
     MODE_ROBOT,
     MODE_FIND_BIKE,
-    MODE_WIFI   
+    MODE_WIFI,
+    MODE_MENU,
+    MODE_CLOCK,
+
+    MODE_ANY
 };
 
 enum RobotEmotion {
@@ -55,6 +59,7 @@ struct DashboardData {
     int currentSpeed;
     int maxSpeed;
     float tripDistance;
+    unsigned long tripSeconds; // [NEW]
     float heading;
     int satellites;
     int batteryPhone;
@@ -62,6 +67,8 @@ struct DashboardData {
     bool isGpsFixed;
     bool isBtConnected;
     String customName;
+    int clockStyle;
+    int brightness;
 };
 
 struct MusicData {

@@ -29,6 +29,7 @@ class GpsManager {
     void begin(ESP32Time* rtc);
     void update(DashboardData* data);
     float getDistance();
+    void resetDistance();
 };
 
 #endif

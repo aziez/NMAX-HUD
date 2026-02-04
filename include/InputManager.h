@@ -1,52 +1,36 @@
-#ifndef INPUTMANAGER_H
-#define INPUTMANAGER_H
+#ifndef INPUT_MANAGER_H
+#define INPUT_MANAGER_H
 
 #include <Arduino.h>
-#include <OneButton.h>
-#include "Config.h"
 #include "GlobalTypes.h"
+#include "InputAction.h"
 
 class InputManager {
-  private:
-    OneButton* btn; 
-
-    // Multi-click Vars
-    int clickCount;
-    unsigned long lastClickTime;
-    const unsigned long CLICK_TIMEOUT = 400;
-
-    // Manual Read Vars
-    int lastSteadyState;
-    int lastFlickerableState;
-    unsigned long lastDebounceTime;
-    
-    // [BARU] Variabel untuk filter durasi tekan
-    unsigned long btnPressTime; 
-
-    // Output
-    int finalCommand;
-    bool jumpTriggered;
-
-    // Mode reference
-    SystemMode *modePtr;
-
-    // Callbacks
-    static void staticClick(void *ptr);
-    static void staticLongPress(void *ptr);
-
-    void onClick();
-    void onLongPress();
-
-  public:
-    InputManager();
-
+public:
     void begin();
     void update();
 
-    void bindMode(SystemMode *mode);
+    void bindMode(SystemMode* modePtr);
 
-    int  getCommand();
-    bool isGameJump();
+    bool hasAction() const;
+    InputAction consumeAction();
+
+private:
+    SystemMode* modePtr = nullptr;
+    InputAction lastAction = ACTION_NONE;
+
+    int readButtonCommand();
+    
+    // Non-blocking button state
+    bool lastBtnState = HIGH;
+    unsigned long btnPressStartTime = 0;
+    unsigned long lastBtnReleaseTime = 0;
+    int clickCount = 0;
+    
+    // Tiered Long Press Flags
+    bool isLongPressHandled = false;
+    bool isLongPress3sHandled = false;
+    bool isLongPress4sHandled = false;
 };
 
 #endif

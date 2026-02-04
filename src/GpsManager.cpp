@@ -14,26 +14,36 @@ GpsManager::GpsManager() {
 void GpsManager::begin(ESP32Time* rtc) {
     rtcRef = rtc;
 
+    // Use 9600 for NEO-6M
     gpsSerial->begin(9600, SERIAL_8N1, GPS_RX_PIN, GPS_TX_PIN);
     gpsSerial->setRxBufferSize(2048);
 
-    Serial.println("GPS NEO-6M Started");
+    Serial.println("GPS NEO-6M Init...");
 
     delay(500);
 
-    // Matikan pesan yang BENAR-BENAR nggak penting
-    gpsSerial->println("$PUBX,40,GLL,0,0,0,0,0,0*5C");
-    delay(100);
-    gpsSerial->println("$PUBX,40,VTG,0,0,0,0,0,0*5E");
-    delay(100);
+    // Filter NMEA Sentences to reduce ESP32 load
+    // Disable GLL, VTG, ZDA, GSV (keep RMC, GGA, GSA for lock & sat info)
+    const char* cmds[] = {
+        "$PUBX,40,GLL,0,0,0,0,0,0*5C",
+        "$PUBX,40,VTG,0,0,0,0,0,0*5E",
+        "$PUBX,40,ZDA,0,0,0,0,0,0*44"
+    };
+
+    for(int i=0; i<3; i++) {
+        gpsSerial->println(cmds[i]);
+        delay(100);
+    }
+    
+    Serial.println("GPS Optimized.");
 }
 
 void GpsManager::update(DashboardData* data) {
 
-    // === 1. BACA SEMUA DATA GPS (JANGAN DITHROTTLE KETAT) ===
-    while (gpsSerial->available()) {
-        char c = gpsSerial->read();
-        gps.encode(c);
+    // === 1. BACA SEMUA DATA GPS (AGRESIF) ===
+    // Jangan biarkan buffer penuh
+    while (gpsSerial->available() > 0) {
+        gps.encode(gpsSerial->read());
     }
 
     // === 2. CEK DATA FRESH ===
@@ -46,7 +56,7 @@ void GpsManager::update(DashboardData* data) {
     // === 3. FIX STATUS (REAL FIX) ===
     bool isFixed =
         gps.location.isValid() &&
-        gps.location.age() < 2000 &&
+        gps.location.age() < 5000 &&
         gps.satellites.isValid() &&
         gps.satellites.value() >= 4 &&
         gps.hdop.isValid() &&
@@ -133,4 +143,9 @@ void GpsManager::syncTime() {
 
 float GpsManager::getDistance() {
     return sessionDistance;
+}
+
+void GpsManager::resetDistance() {
+    sessionDistance = 0;
+    maxSpeed = 0;
 }

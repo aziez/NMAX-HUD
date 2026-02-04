@@ -30,42 +30,41 @@ public:
     bool btConnected,
     bool blink
   ) {
-    // Background (soft header)
+    // Floating Status Bar (6px padding from left/right)
     d->setDrawColor(1);
-    d->drawBox(0, 0, 128, 10);
+    d->drawRBox(6, 1, 116, 11, 2);
 
     d->setDrawColor(0);
     d->setFont(FONT_MICRO);
 
-    // Title
-    d->setCursor(2, 8);
-    d->print(title.substring(0, 10));
+    // Title (shifted right)
+    d->setCursor(10, 9);
+    d->print(title.substring(0, 8));
 
     // Bluetooth Indicator
     if (btConnected) {
-      d->drawDisc(50, 5, 2);
+      d->drawDisc(54, 6, 2);
     }
 
     // Satellite / GPS
-    d->setCursor(58, 8);
+    d->setCursor(62, 9);
     if (sat > 0) {
+      if (sat < 10) d->print(" "); // align single digit
       d->print(sat);
     } else if (blink) {
-      d->print("?");
+      d->print(" ?");
     }
 
     // Battery
+    d->drawFrame(80, 4, 12, 5);
     if (bat >= 0) {
-      d->drawFrame(72, 2, 14, 6);
-      int fill = map(bat, 0, 100, 0, 12);
-      if (fill > 0) d->drawBox(73, 3, fill, 4);
-    } else {
-      d->drawStr(72, 8, "--");
+      int fill = map(bat, 0, 100, 0, 10);
+      if (fill > 0) d->drawBox(81, 5, fill, 3);
     }
 
-    // Time
+    // Time (shifted left)
     d->setFont(FONT_TINY);
-    d->setCursor(96, 8);
+    d->setCursor(96, 9);
     d->print(time);
 
     d->setDrawColor(1);

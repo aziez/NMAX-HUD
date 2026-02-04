@@ -23,41 +23,33 @@ public:
     d->setDrawColor(1);
 
     /* ================= DIRECTION TEXT ================= */
-    // Indonesia direction labels
     static const char* DIR[] = {"U", "TL", "T", "TG", "S", "BD", "B", "BL"};
     int dirIndex = ((int)(data.heading + 22.5) / 45) % 8;
 
     d->setFont(u8g2_font_logisoso34_tf);
     int dirW = d->getStrWidth(DIR[dirIndex]);
-    d->setCursor(64 - (dirW / 2), 48);
+    d->setCursor(72 - (dirW / 2), 52); // Shifted right and down
     d->print(DIR[dirIndex]);
 
     /* ================= DEGREE ================= */
-    d->setFont(FONT_TINY);
-    d->setCursor(96, 24);
-    d->print((int)data.heading);
-    d->drawStr(114, 24, "°");
+    d->setFont(u8g2_font_helvB08_tr);
+    d->setCursor(102, 38);
+    d->printf("%d", (int)data.heading);
+    d->drawStr(102 + d->getStrWidth(String((int)data.heading).c_str()) + 2, 38, "o");
 
     /* ================= COMPASS RING ================= */
-    const int cx = 24;
-    const int cy = 40;
-    const int r  = 17;
+    // Moved away from the edge (cx: 24 -> 32)
+    const int cx = 32;
+    const int cy = 42;
+    const int r  = 16;
 
     d->drawCircle(cx, cy, r);
-    d->drawCircle(cx, cy, r - 1); // double ring for clarity
+    d->drawCircle(cx, cy, r - 1);
 
-    // Static North label
-    d->setFont(FONT_MICRO);
-    d->drawStr(cx - 3, cy - r - 2, "N");
-
-    /* ================= NORTH INDICATOR ================= */
-    // Heading: 0 = North, 90 = East
-    // North relative to rider
+    // Dynamic North Indicator
     float angle = (270.0 - data.heading) * DEG_TO_RAD;
-
     int nx = cx + (r - 4) * cos(angle);
     int ny = cy + (r - 4) * sin(angle);
-
     d->drawDisc(nx, ny, 3);
   }
 };
